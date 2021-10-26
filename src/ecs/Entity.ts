@@ -2,7 +2,6 @@ import { Constructor, InstancesTypes } from "./utils";
 
 export class Entity {
   _components: { [Key: string]: any } = {};
-
   add<ComponentConstructor extends Constructor>(
     constructor: ComponentConstructor,
     ...args: ConstructorParameters<ComponentConstructor>
@@ -14,9 +13,9 @@ export class Entity {
   get<
     ComponentConstructor extends Constructor,
     ComponentConstructors extends ComponentConstructor[],
-  >(
-    ...constructors: ComponentConstructors
-  ): InstancesTypes<ComponentConstructors> | undefined {
+    >(
+      ...constructors: ComponentConstructors
+    ): InstancesTypes<ComponentConstructors> | undefined {
     const components = constructors.map((
       constructor: ComponentConstructor,
     ) => this._components[constructor.name]);

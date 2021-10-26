@@ -1,100 +1,44 @@
 import { ECS } from "./ecs";
-import {
-  Collider,
-  Input,
-  Position,
-  Shape,
-  Tag,
-  Timer,
-  Velocity,
-} from "./components";
-import {
-  InputSystem,
-  MovementSystem,
-  RenderingSystem,
-  TimerSystem,
-} from "./systems";
+import { equal, MouseInput, Position, Shape, Tag, Velocity } from "./components";
+import { set, grid } from "./components";
+import { ExplodableSystem, KeyboardInputSystem, MouseInputSystem, MovementSystem, RenderSystem, TimerSystem } from "./systems";
+import { createBomb, createWall } from "./helpers";
 
 const ecs = new ECS();
 
-function createLava(
-  ecs: ECS,
-  x: number,
-  y: number,
-  dir: { x: number; y: number },
-  rec: number = 0,
-) {
-  return ecs.createEntity()
-    .add(Tag, "bomb")
-    .add(Position, x, y)
-    .add(Shape, 50, 50, "red")
-    .add(Timer, {
-      timeout: 200,
-      callback: (entity) => {
-        if (rec > 0) {
-          createLava(ecs, x + dir.x, y + dir.y, dir, rec - 1);
-        }
-      },
-    }, {
-      timeout: 300,
-      callback: (entity) => {
-        ecs.removeEntity(entity);
-      },
-    });
-}
 
-function createBomb(ecs: ECS, x: number, y: number, rad = 3) {
-  return ecs.createEntity()
-    .add(Tag, "bomb")
-    .add(Position, x, y)
-    .add(Shape, 50, 50)
-    .add(Timer, {
-      timeout: 1000,
-      callback: (entity) => {
-        // do the explotion
-        const [shape] = entity.get(Shape) || [undefined];
-        if (!shape) return;
-        shape.color = "red";
-        const [position] = entity.get(Position) || [undefined];
-        if (!position) return;
-        createLava(ecs, position.x + 50, position.y, { x: 50, y: 0 }, rad);
-        createLava(ecs, position.x, position.y + 50, { x: 0, y: 50 }, rad);
-        createLava(ecs, position.x - 50, position.y, { x: -50, y: 0 }, rad);
-        createLava(ecs, position.x, position.y - 50, { x: 0, y: -50 }, rad);
-      },
-    }, {
-      timeout: 1500,
-      callback: (entity) => {
-        ecs.removeEntity(entity);
-      },
-    });
-}
-createBomb(ecs, 30, 30);
+//createBomb(ecs, 30, 30);
+
 ecs.createEntity()
   .add(Position, 10, 10)
   //.add(Velocity, 1, 1)
   .add(Shape, 10, 10)
-  .add(Input, {
-    mouseenter: (entity) => {
-      const [shape] = entity.get(Shape) || [undefined];
+  .add(MouseInput, {
+    mouseEnter: (_, entity) => {
+      const shape = entity.getOne(Shape);
       if (!shape) return;
       shape.color = "green";
     },
-    mouseleave: (entity) => {
-      const [shape] = entity.get(Shape) || [undefined];
+    mouseLeave: (_, entity) => {
+      const shape = entity.getOne(Shape);
       if (!shape) return;
       shape.color = "red";
     },
     /*
     mousemove: (entity, mousePosition) => {
-      const [position] = entity.get(Position) || [undefined];
+      const position = entity.getOne(Position);
       if (!position) return;
       position.x = mousePosition.x;
       position.y = mousePosition.y;
     },
     */
-    mouseclick: (entity) => {
-      const [shape] = entity.get(Shape) || [undefined];
+    mouseLeftClick: (_, entity) => {
+      const shape = entity.getOne(Shape);
+      if (!shape) return;
+      shape.color = "blue" ? "red" : "blue";
+    },
+    mouseRightClick: (_, entity) => {
+      const shape = entity.getOne(Shape);
       if (!shape) return;
       shape.color = "blue" ? "red" : "blue";
     },
@@ -110,42 +54,68 @@ ecs.createEntity()
   .add(Tag, "mouse")
   .add(Position, 50, 50)
   .add(Shape, 50, 50, "blue")
-  .add(Input, {
-    mouseclick: (entity, position) => {
-      const gridCubeWidth = 50;
-      const gridCubeHeight = 50;
+  .add(MouseInput, {
+    mouseLeftClick: (ecs, entity, position) => {
+      const shape = entity.getOne(Shape)
+      const cursor = entity.getOne(Position);
+      if (!shape || !cursor) return;
+      const grid_position = grid(position, shape);
 
-      const x = Math.round(position.x / gridCubeWidth) * gridCubeWidth - 25;
-      const y = Math.round(position.y / gridCubeHeight) * gridCubeHeight - 25;
-      createBomb(ecs, x, y);
-    },
-    mousemove: (entity, position) => {
-      const gridCubeWidth = 50;
-      const gridCubeHeight = 50;
-
-      const x = Math.round(position.x / gridCubeWidth) * gridCubeWidth - 25;
-      const y = Math.round(position.y / gridCubeHeight) * gridCubeHeight - 25;
-      const [cursor_position] = entity.get(Position) || [undefined];
-      if (cursor_position) {
-        cursor_position.x = x;
-        cursor_position.y = y;
+      if (!ecs.getEntities(Shape, Position, Tag).some(([_entity, _shape, pos, tag]) => equal(pos, grid_position) && !tag.has('mouse'))) {
+        createBomb(ecs, grid_position, 100);
       }
+    },
+    mouseRightClick: (ecs, entity, position) => {
+      const shape = entity.getOne(Shape)
+      const cursor = entity.getOne(Position);
+      if (!shape || !cursor) return;
+      const grid_position = grid(position, shape);
+      if (!ecs.getEntities(Shape, Position, Tag).some(([_entity, _shape, pos, tag]) => equal(pos, grid_position) && !tag.has('mouse'))) {
+        createWall(ecs, grid_position);
+      }
+    },
+    mouseMove: (_, entity, position) => {
+      const shape = entity.getOne(Shape)
+      const cursor = entity.getOne(Position);
+      if (!shape || !cursor) return;
+      set(cursor, grid(position, shape))
     },
   });
 
+const width = 800;
+const height = 600;
+
 ecs
-  .add(InputSystem)
-  .add(TimerSystem)
-  .add(MovementSystem)
-  .add(RenderingSystem, 800, 600);
+  .addSystem(MouseInputSystem)
+  .addSystem(KeyboardInputSystem)
+  .addSystem(TimerSystem)
+  .addSystem(MovementSystem, { loop: true })
+  .addSystem(ExplodableSystem)
+  .addSystem(RenderSystem, 800, 600);
 
-let elapsed = 0;
-let delta = 10;
-setInterval(() => {
 
-  console.group("UPDATE");
-  elapsed += delta;
-  ecs.fixedUpdate();
-  ecs.update(delta, elapsed);
-  console.groupEnd();
-}, delta);
+for (let x = 0; x < width; x += 50) {
+  for (let y = 0; y < height; y += 50) {
+    if (x === 50 && y === 50) continue;
+    if (x === 0 || y === 0 || x === (width - 50) || y === (height - 50)) {
+      createWall(ecs, { x, y }, false);
+    }
+    else {
+      createWall(ecs, { x, y }, true);
+    }
+
+
+  }
+}
+
+
+process.once('SIGINT', () => {
+  console.log('clean stop')
+  ecs.stop();
+})
+
+process.once('exit', () => {
+  ecs.delete()
+})
+
+ecs.start();

@@ -18,9 +18,8 @@
   },
   "homepage": "https://github.com/p8nut/ecs-typescript#readme",
   "devDependencies": {
-    "@types/node": "^15.12.4",
-    "tslint": "^6.1.3",
-    "typescript": "^4.3.4"
+    "@types/node": "^16.9.4",
+    "typescript": "^4.4.3"
   },
   "dependencies": {
     "raylib": "^0.8.1",
